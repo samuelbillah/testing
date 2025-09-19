@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Mosquito Control Interventions Simulator</title>
+  <style>
+    :root{
+      --bg:#071426; --card:#071226; --muted:#9fb0c8;
+      --accent:#60a5fa; --good:#22c55e; --warn:#f97316;
+      font-family:Inter,system-ui,Segoe UI,Roboto,Arial;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:linear-gradient(180deg,var(--bg),#03101a);color:#e6eef8;padding:18px;display:flex;flex-direction:column;align-items:center;gap:12px}
+    h1{margin:0;font-size:20px}
+    .wrap{width:100%;max-width:1150px;display:grid;grid-template-columns:1fr 380px;gap:16px}
+    .card{background:var(--card);border-radius:12px;padding:14px;border:1px solid rgba(255,255,255,0.03);box-shadow:0 6px 24px rgba(0,0,0,0.6)}
+    .top{display:flex;justify-content:space-between;align-items:center}
+    .controls{display:flex;flex-direction:column;gap:10px;margin-top:8px}
+    label{width:170px;font-size:13px;color:var(--muted)}
+    .row{display:flex;align-items:center;gap:10px}
+    input[type=range]{flex:1}
+    .buttons{display:flex;gap:8px}
+    button{background:linear-gradient(180deg,var(--accent),#3b82f6);border:0;padding:8px 10px;border-radius:10px;color:white;cursor:pointer}
+    button.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06)}
+    button.warn{background:linear-gradient(180deg,#f97316,#ef4444)}
+    .viz{display:flex;flex-direction:column;gap:12px}
+    .bars{display:flex;gap:10px;align-items:end;height:220px;padding:12px;border-radius:8px}
+    .bar{flex:1;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.005));border-radius:8px;padding:8px;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:8px}
+    .bar-rect{width:60%;border-radius:6px;background:linear-gradient(180deg,#60a5fa,#3b82f6);transition:height 0.12s linear}
+    .small{font-size:13px;color:var(--muted)}
+    canvas#chart{width:100%;height:160px;background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.00));border-radius:8px}
+    .stat{background:rgba(255,255,255,0.02);padding:8px;border-radius:8px;text-align:center;min-width:90px}
+    .legend{display:flex;gap:10px;align-items:center}
+    .legend .dot{width:10px;height:10px;border-radius:50%}
+    .footer{font-size:13px;color:var(--muted);text-align:center;margin-top:8px}
+    @media (max-width:980px){.wrap{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <h1>Mosquito Control Interventions Simulator</h1>
+
+  <div class="wrap">
+    <!-- Left: Visualization -->
+    <div class="card">
+      <div class="top">
+        <div>
+          <div class="small">Compare interventions: Source reduction, Insecticide spraying, Bed nets</div>
+          <div style="font-weight:700;margin-top:6px">Stages: Eggs → Larvae → Pupae → Adults</div>
+        </div>
+        <div class="buttons">
+          <button id="startBtn">Start</button>
+          <button class="ghost" id="pauseBtn">Pause</button>
+          <button class="ghost" id="resetBtn">Reset</button>
+        </div>
+      </div>
+
+      <div style="height:12px"></div>
+
+      <div class="viz">
+        <div class="bars" aria-hidden="true">
+          <div class="bar"><div id="egBar" class="bar-rect" style="height:10%"></div><div class="small">Eggs<br><span id="egVal">0</span></div></div>
+          <div class="bar"><div id="larvBar" class="bar-rect" style="background:linear-gradient(180deg,#86efac,#22c55e);height:8%"></div><div class="small">Larvae<br><span id="larvVal">0</span></div></div>
+          <div class="bar"><div id="pupBar" class="bar-rect" style="background:linear-gradient(180deg,#ffd166,#f59e0b);height:6%"></div><div class="small">Pupae<br><span id="pupVal">0</span></div></div>
+          <div class="bar"><div id="adBar" class="bar-rect" style="background:linear-gradient(180deg,#a78bfa,#7c3aed);height:4%"></div><div class="small">Adults<br><span id="adVal">0</span></div></div>
+        </div>
+
+        <canvas id="chart" width="680" height="160"></canvas>
+
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div class="legend">
+            <div class="dot" style="background:#7c3aed"></div><div class="small">Adults</div>
+            <div style="width:12px"></div>
+            <div class="dot" style="background:#16a34a"></div><div class="small">Larvae (scaled)</div>
+          </div>
+
+          <div style="display:flex;gap:8px;align-items:center">
+            <div class="stat"><div class="small">Breeding sites</div><div id="siteCount" style="font-weight:700">50</div></div>
+            <div class="stat"><div class="small">Day</div><div id="dayCount" style="font-weight:700">0</div></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Right: Controls -->
+    <div class="card">
+      <div style="font-weight:700">Control Panel — Interventions</div>
+      <div style="height:8px"></div>
+
+      <div class="controls">
+        <div class="row"><label>Number of breeding sites</label><input id="sitesRange" type="range" min="0" max="500" step="1" value="50"></div>
+        <div class="row"><label>Carrying capacity per site</label><input id="capRange" type="range" min="5" max="300" step="1" value="50"></div>
+
+        <hr style="border:none;border-top:1px solid rgba(255,255,255,0.03)">
+
+        <div style="font-weight:700">Source reduction (remove sites)</div>
+        <div class="row"><label>Mode</label>
+          <select id="sourceMode"><option value="oneoff">One-off</option><option value="periodic">Periodic</option></select>
+        </div>
+        <div class="row"><label>Remove % of sites</label><input id="sourceStrength" type="range" min="0" max="100" step="1" value="30"></div>
+        <div class="row"><label>Period (days, if periodic)</label><input id="sourcePeriod" type="range" min="1" max="30" step="1" value="7"></div>
+        <div class="row"><label></label><button id="applySourceBtn" class="warn">Apply Source Reduction</button></div>
+
+        <hr style="border:none;border-top:1px solid rgba(255,255,255,0.03)">
+
+        <div style="font-weight:700">Insecticide spraying (adult kill)</div>
+        <div class="row"><label>Mode</label>
+          <select id="sprayMode"><option value="oneoff">One-off</option><option value="periodic">Periodic</option></select>
+        </div>
+        <div class="row"><label>Kill % of adults</label><input id="sprayStrength" type="range" min="0" max="100" step="1" value="60"></div>
+        <div class="row"><label>Period (days, if periodic)</label><input id="sprayPeriod" type="range" min="1" max="30" step="1" value="14"></div>
+        <div class="row"><label></label><button id="applySprayBtn" class="warn">Apply Spraying</button></div>
+
+        <hr style="border:none;border-top:1px solid rgba(255,255,255,0.03)">
+
+        <div style="font-weight:700">Bed nets (reduce adult survival)</div>
+        <div class="row"><label>Coverage % (reduces adult survival)</label><input id="netsCoverage" type="range" min="0" max="100" step="1" value="30"></div>
+        <div class="row"><label>Effectiveness %</label><input id="netsEffect" type="range" min="0" max="100" step="1" value="50"></div>
+        <div class="row"><label></label><button id="applyNetsBtn" class="ghost">Apply Bed Nets (continuous)</button></div>
+
+        <hr style="border:none;border-top:1px solid rgba(255,255,255,0.03)">
+
+        <div class="row"><label>Larval daily mortality %</label><input id="larvMort" type="range" min="0" max="80" step="1" value="8"></div>
+        <div class="row"><label>Adult daily mortality % (base)</label><input id="adultMort" type="range" min="0" max="80" step="1" value="12"></div>
+
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button id="exportBtn">Download CSV</button>
+          <button id="resetInterventionsBtn" class="ghost">Reset Interventions</button>
+        </div>
+
+        <div style="height:8px"></div>
+        <div class="small">Notes: This is a teaching model. Interventions are simplified: source reduction removes sites; sprays kill adults immediately; bed nets reduce daily adult survival rate (continuous).</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">Copy the file and open it locally. Ask me to add animations, explanations, or make interventions stochastic/targeted.</div>
+
+<script>
+/* -------------------------
+   Model state & parameters
+   ------------------------- */
+const S = {
+  // habitat & populations
+  sites: 50,
+  capPerSite: 50,
+  eggs: 800, larvae: 300, pupae: 120, adults: 80,
+  t: 0, running: false,
+  history: [],
+
+  // mortality rates (daily fractions)
+  larvMortBase: 0.08, adultMortBase: 0.12,
+
+  // interventions record
+  interventions: {
+    source: {mode:'oneoff', strength:0.30, period:7, nextAt:0},
+    spray: {mode:'oneoff', strength:0.60, period:14, nextAt:0},
+    nets:  {coverage:0.30, effect:0.5}
+  }
+};
+
+// model transitions (per day rates)
+const P = {
+  eggsToLarvaRate: 0.25, // fraction/day
+  larvaToPupaRate: 0.10,
+  pupaToAdultRate: 0.20,
+  eggsPerAdultPerDay: 20
+};
+
+/* -------------------------
+   DOM refs
+   ------------------------- */
+const sitesRange = document.getElementById('sitesRange');
+const capRange = document.getElementById('capRange');
+const egBar = document.getElementById('egBar');
+const larvBar = document.getElementById('larvBar');
+const pupBar = document.getElementById('pupBar');
+const adBar = document.getElementById('adBar');
+const egVal = document.getElementById('egVal');
+const larvVal = document.getElementById('larvVal');
+const pupVal = document.getElementById('pupVal');
+const adVal = document.getElementById('adVal');
+const siteCount = document.getElementById('siteCount');
+const dayCount = document.getElementById('dayCount');
+const chart = document.getElementById('chart'); const ctx = chart.getContext('2d');
+
+const startBtn = document.getElementById('startBtn'), pauseBtn = document.getElementById('pauseBtn'), resetBtn = document.getElementById('resetBtn');
+const sitesInput = document.getElementById('sitesRange'), capInput = document.getElementById('capRange');
+
+const sourceMode = document.getElementById('sourceMode'), sourceStrength = document.getElementById('sourceStrength'), sourcePeriod = document.getElementById('sourcePeriod'), applySourceBtn = document.getElementById('applySourceBtn');
+const sprayMode = document.getElementById('sprayMode'), sprayStrength = document.getElementById('sprayStrength'), sprayPeriod = document.getElementById('sprayPeriod'), applySprayBtn = document.getElementById('applySprayBtn');
+const netsCoverage = document.getElementById('netsCoverage'), netsEffect = document.getElementById('netsEffect'), applyNetsBtn = document.getElementById('applyNetsBtn');
+const larvMort = document.getElementById('larvMort'), adultMort = document.getElementById('adultMort');
+const exportBtn = document.getElementById('exportBtn'), resetInterventionsBtn = document.getElementById('resetInterventionsBtn');
+
+/* -------------------------
+   UI initialization
+   ------------------------- */
+sitesInput.value = S.sites; capInput.value = S.capPerSite;
+siteCount.textContent = S.sites; dayCount.textContent = 0;
+sourceStrength.value = 30; sourcePeriod.value = 7; sourceMode.value = 'oneoff';
+sprayStrength.value = 60; sprayPeriod.value = 14; sprayMode.value = 'oneoff';
+netsCoverage.value = 30; netsEffect.value = 50;
+larvMort.value = S.larvMortBase*100; adultMort.value = S.adultMortBase*100;
+
+/* -------------------------
+   Helpers & model functions
+   ------------------------- */
+function larvalCapacity(){
+  return Math.max(10, S.sites * S.capPerSite);
+}
+
+function applyOneOffSource(strPct){
+  const remove = Math.floor(S.sites * strPct);
+  S.sites = Math.max(0, S.sites - remove);
+  sitesInput.value = S.sites; siteCount.textContent = S.sites;
+}
+
+function applyPeriodicSource(strPct, period){
+  // schedule next event after 'period' days
+  S.interventions.source.mode = 'periodic';
+  S.interventions.source.strength = strPct;
+  S.interventions.source.period = period;
+  S.interventions.source.nextAt = S.t + period;
+}
+
+function applyOneOffSpray(killPct){
+  const killed = Math.floor(S.adults * killPct);
+  S.adults = Math.max(0, S.adults - killed);
+}
+
+function applyPeriodicSpray(killPct, period){
+  S.interventions.spray.mode = 'periodic';
+  S.interventions.spray.strength = killPct;
+  S.interventions.spray.period = period;
+  S.interventions.spray.nextAt = S.t + period;
+}
+
+function applyNets(coverage, effect){
+  // coverage: fraction of population using nets; effect: reduction in daily survival for those covered
+  S.interventions.nets.coverage = coverage;
+  S.interventions.nets.effect = effect;
+}
+
+/* -------------------------
+   Model step (dt in days)
+   ------------------------- */
+function step(dt){
+  // eggs produced
+  const eggsProduced = S.adults * P.eggsPerAdultPerDay * dt;
+
+  // eggs -> larvae
+  const eggsToLarv = S.eggs * (1 - Math.exp(-P.eggsToLarvaRate * dt));
+
+  // larval density-dependence (capacity)
+  const cap = larvalCapacity();
+  let densityFactor = 1.0;
+  if(S.larvae > cap) densityFactor = cap / (S.larvae + 1e-9);
+
+  const larvToPupa = S.larvae * (1 - Math.exp(-P.larvaToPupaRate * dt)) * densityFactor;
+  const larvaeMort = S.larvae * (S.larvMortBase * dt);
+
+  const pupToAdult = S.pupae * (1 - Math.exp(-P.pupaToAdultRate * dt));
+  const adultMortBase = S.adultMortBase * dt;
+
+  // bed nets effect: reduce daily survival by (coverage * effect)
+  const netsCover = S.interventions.nets.coverage || 0;
+  const netsEff = S.interventions.nets.effect || 0;
+  const netsReduction = netsCover * netsEff; // fraction 0..1
+  const adultMortAdjusted = Math.min(0.95, adultMortBase + netsReduction * adultMortBase);
+
+  // update compartments
+  S.eggs += eggsProduced - eggsToLarv;
+  S.larvae += eggsToLarv - larvToPupa - larvaeMort;
+  S.pupae += larvToPupa - pupToAdult;
+  S.adults += pupToAdult - (S.adults * adultMortAdjusted);
+
+  // clamp
+  S.eggs = Math.max(0, S.eggs);
+  S.larvae = Math.max(0, S.larvae);
+  S.pupae = Math.max(0, S.pupae);
+  S.adults = Math.max(0, S.adults);
+
+  S.t += dt;
+  // record
+  S.history.push({t: S.t, eggs: Math.round(S.eggs), larvae: Math.round(S.larvae), pupae: Math.round(S.pupae), adults: Math.round(S.adults), sites: S.sites});
+  if(S.history.length > 20000) S.history.shift();
+
+  // handle periodic interventions if they are due
+  // source periodic
+  if(S.interventions.source.mode === 'periodic' && S.t >= (S.interventions.source.nextAt || 1e9)){
+    const str = S.interventions.source.strength;
+    applyOneOffSource(str);
+    S.interventions.source.nextAt = S.t + S.interventions.source.period;
+  }
+  // spray periodic
+  if(S.interventions.spray.mode === 'periodic' && S.t >= (S.interventions.spray.nextAt || 1e9)){
+    const kill = S.interventions.spray.strength;
+    applyOneOffSpray(kill);
+    S.interventions.spray.nextAt = S.t + S.interventions.spray.period;
+  }
+}
+
+/* -------------------------
+   Drawing & UI updates
+   ------------------------- */
+function updateBars(){
+  const maxDisplay = Math.max(S.eggs, S.larvae, S.pupae, S.adults, S.sites * S.capPerSite, 1000);
+  function pct(n){ return Math.max(4, Math.min(96, (n / maxDisplay) * 96)); }
+  egBar.style.height = pct(S.eggs) + '%'; egVal.textContent = Math.round(S.eggs);
+  larvBar.style.height = pct(S.larvae) + '%'; larvVal.textContent = Math.round(S.larvae);
+  pupBar.style.height = pct(S.pupae) + '%'; pupVal.textContent = Math.round(S.pupae);
+  adBar.style.height = pct(S.adults) + '%'; adVal.textContent = Math.round(S.adults);
+  siteCount.textContent = S.sites; dayCount.textContent = Math.floor(S.t);
+}
+
+function drawChart(){
+  ctx.clearRect(0,0,chart.width,chart.height);
+  // grid
+  ctx.fillStyle = 'rgba(255,255,255,0.02)'; ctx.fillRect(0,0,chart.width,chart.height);
+  ctx.strokeStyle = 'rgba(255,255,255,0.04)'; ctx.lineWidth = 1;
+  for(let i=0;i<4;i++){ ctx.beginPath(); ctx.moveTo(0,i*(chart.height/4)); ctx.lineTo(chart.width,i*(chart.height/4)); ctx.stroke(); }
+  if(S.history.length < 2) return;
+  const data = S.history.slice(-300);
+  const maxA = Math.max(...data.map(d=>d.adults), 10);
+  const minT = data[0].t, maxT = data[data.length-1].t;
+  function x(t){ return ((t - minT) / Math.max(1e-6, (maxT - minT))) * chart.width; }
+  function y(v){ return chart.height - (v / Math.max(1, maxA)) * chart.height; }
+  // adults
+  ctx.beginPath(); ctx.lineWidth = 2.5; ctx.strokeStyle = '#7c3aed';
+  data.forEach((d,i)=>{ const xx = x(d.t); const yy = y(d.adults); if(i===0) ctx.moveTo(xx,yy); else ctx.lineTo(xx,yy); }); ctx.stroke();
+  // larvae (scaled)
+  ctx.beginPath(); ctx.lineWidth = 1.8; ctx.strokeStyle = '#16a34a';
+  data.forEach((d,i)=>{ const xx = x(d.t); const yy = y(d.larvae * 0.6); if(i===0) ctx.moveTo(xx,yy); else ctx.lineTo(xx,yy); }); ctx.stroke();
+  // labels
+  ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.font = '12px Inter'; ctx.fillText('Adults (purple) — Larvae (green, scaled)', 8, 14);
+}
+
+/* -------------------------
+   Animation & simulation loop
+   ------------------------- */
+let lastAnim = performance.now();
+function loop(now){
+  const elapsed = (now - lastAnim) / 1000; lastAnim = now;
+  if(S.running){
+    // speed-up: 1 real second ~ 0.6 sim days (choose a number that feels responsive)
+    const simDt = Math.min(0.7, elapsed * 0.6);
+    step(simDt);
+    updateBars(); drawChart();
+  }
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+/* -------------------------
+   UI bindings
+   ------------------------- */
+sitesInput.addEventListener('input', e=>{ S.sites = parseInt(e.target.value); siteCount.textContent = S.sites; });
+capInput.addEventListener('input', e=>{ S.capPerSite = parseInt(e.target.value); });
+
+startBtn.addEventListener('click', ()=>{ S.running = true; lastAnim = performance.now(); });
+pauseBtn.addEventListener('click', ()=>{ S.running = false; });
+resetBtn.addEventListener('click', ()=>{ 
+  S.running = false; S.t = 0; S.sites = 50; S.capPerSite = 50;
+  S.eggs = 800; S.larvae = 300; S.pupae = 120; S.adults = 80;
+  S.history = []; siteCount.textContent = S.sites; sitesInput.value = S.sites; capInput.value = S.capPerSite;
+  // reset interventions
+  S.interventions = { source:{mode:'oneoff',strength:0.30,period:7,nextAt:0}, spray:{mode:'oneoff',strength:0.60,period:14,nextAt:0}, nets:{coverage:0.30,effect:0.5} };
+  sourceMode.value='oneoff'; sourceStrength.value=30; sourcePeriod.value=7;
+  sprayMode.value='oneoff'; sprayStrength.value=60; sprayPeriod.value=14;
+  netsCoverage.value=30; netsEffect.value=50;
+  larvMort.value = 8; adultMort.value = 12;
+  S.larvMortBase = 0.08; S.adultMortBase = 0.12;
+  updateBars(); drawChart();
+});
+
+applySourceBtn.addEventListener('click', ()=>{
+  const mode = sourceMode.value;
+  const strength = parseInt(sourceStrength.value)/100;
+  const period = parseInt(sourcePeriod.value);
+  if(mode === 'oneoff'){ applyOneOffSource(strength); } else { applyPeriodicSource(strength, period); }
+});
+
+applySprayBtn.addEventListener('click', ()=>{
+  const mode = sprayMode.value;
+  const strength = parseInt(sprayStrength.value)/100;
+  const period = parseInt(sprayPeriod.value);
+  if(mode === 'oneoff'){ applyOneOffSpray(strength); } else { applyPeriodicSpray(strength, period); }
+});
+
+applyNetsBtn.addEventListener('click', ()=>{
+  const cov = parseInt(netsCoverage.value)/100;
+  const eff = parseInt(netsEffect.value)/100;
+  applyNets(cov, eff);
+});
+
+larvMort.addEventListener('input', e=>{ S.larvMortBase = parseInt(e.target.value)/100; });
+adultMort.addEventListener('input', e=>{ S.adultMortBase = parseInt(e.target.value)/100; });
+
+resetInterventionsBtn.addEventListener('click', ()=>{
+  // revert to defaults
+  S.interventions = { source:{mode:'oneoff',strength:0.30,period:7,nextAt:0}, spray:{mode:'oneoff',strength:0.60,period:14,nextAt:0}, nets:{coverage:0.30,effect:0.5} };
+  sourceMode.value='oneoff'; sourceStrength.value=30; sourcePeriod.value=7;
+  sprayMode.value='oneoff'; sprayStrength.value=60; sprayPeriod.value=14;
+  netsCoverage.value=30; netsEffect.value=50;
+});
+
+/* -------------------------
+   CSV Export
+   ------------------------- */
+exportBtn.addEventListener('click', ()=>{
+  let csv = 'day,eggs,larvae,pupae,adults,sites\\n';
+  S.history.forEach(r=>{ csv += `${r.t.toFixed(2)},${r.eggs},${r.larvae},${r.pupae},${r.adults},${r.sites}\\n`; });
+  const blob = new Blob([csv], {type:'text/csv'}); const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = 'mosquito_control_data.csv'; a.click(); URL.revokeObjectURL(url);
+});
+
+/* -------------------------
+   Seed history & initial draw
+   ------------------------- */
+for(let i=0;i<6;i++){ S.history.push({t:i,eggs:S.eggs,larvae:S.larvae,pupae:S.pupae,adults:S.adults,sites:S.sites}); }
+updateBars(); drawChart();
+
+</script>
+</body>
+</html>
